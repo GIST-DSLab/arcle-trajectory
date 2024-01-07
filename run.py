@@ -5,7 +5,6 @@ import hydra
 from omegaconf import DictConfig
 from omegaconf import OmegaConf
 
-import foarcle
 from arcle.loaders import Loader
 from loader import SizeConstrainedLoader
 import wandb
@@ -48,13 +47,13 @@ def main(cfg: DictConfig) -> None:
     )
     if cfg.env.use_arc:
         env = gym.make(
-            'ARCLE/FOO2ARCv2Env-v0', 
+            'ARCLE/O2ARCv2Env-v0', 
             data_loader = SizeConstrainedLoader(cfg.env.grid_x), 
             max_grid_size=(cfg.env.grid_x, cfg.env.grid_y), 
             colors=cfg.env.num_colors)
     else:
         env = gym.make(
-            'ARCLE/FOO2ARCv2Env-v0', 
+            'ARCLE/O2ARCv2Env-v0', 
             data_loader = TestLoader(cfg.env.grid_x, cfg.env.grid_y), 
             max_grid_size=(cfg.env.grid_x, cfg.env.grid_y), 
             colors=cfg.env.num_colors)

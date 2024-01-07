@@ -3,7 +3,77 @@ import numpy as np
 from copy import deepcopy
 from tqdm import trange
 from utils.util import RunningMeanStd
-from foarcle.actions.o2actions import batch_act
+
+def batch_act_env(env, b_inp, b_inp_dim, b_answer, b_answer_dim,
+    b_grid, b_grid_dim, b_selected, b_clip, b_clip_dim, b_terminated, b_trials_remain,
+    b_active, b_object_, b_object_sel, b_object_dim, b_object_pos, b_background, b_rotation_parity,
+    b_selection, b_operation):
+    nb_grid = b_grid.copy()
+    nb_grid_dim = b_grid_dim.copy()
+    nb_selected = b_selected.copy()
+    nb_clip = b_clip.copy()
+    nb_clip_dim = b_clip_dim.copy()
+    nb_terminated = b_terminated.copy()
+    nb_trials_remain = b_trials_remain.copy()
+    nb_active = b_active.copy()
+    nb_object_ = b_object_.copy()
+    nb_object_sel = b_object_sel.copy()
+    nb_object_dim = b_object_dim.copy()
+    nb_object_pos = b_object_pos.copy()
+    nb_background = b_background.copy()
+    nb_rotation_parity = b_rotation_parity.copy()
+    reward = b_active.copy()
+    for i, (
+        inp, inp_dim, answer, answer_dim, grid, grid_dim, selected, clip, clip_dim, terminated, trials_remain,
+        active, object_, object_sel, object_dim, object_pos, background, rotation_parity,
+        selection, operation
+    ) in enumerate(zip(
+        b_inp, b_inp_dim, b_answer, b_answer_dim, b_grid, b_grid_dim, b_selected, b_clip, b_clip_dim, b_terminated, b_trials_remain,
+        b_active, b_object_, b_object_sel, b_object_dim, b_object_pos, b_background, b_rotation_parity, 
+        b_selection, b_operation)):
+
+        state = {
+            "trials_remain": trials_remain,
+            "terminated": terminated,
+            "input":inp,
+            "input_dim": inp_dim,    
+            "grid": grid,
+            "grid_dim": grid_dim,
+            "selected": selected,
+            "clip" : clip,
+            "clip_dim" : clip_dim,
+            "object_states": {
+                "active": active, 
+                "object": object_,
+                "object_sel": object_sel,
+                "object_dim": object_dim,
+                "object_pos": object_pos, 
+                "background": background, 
+                "rotation_parity": rotation_parity,
+            }
+        }
+        action = {
+            "selection" : selection,
+            "operation" : operation,
+        }
+        env.unwrapped.transition(state, action)
+        rwd = env.unwrapped.reward(state)
+
+        (nb_grid[i], nb_grid_dim[i], nb_selected[i], nb_clip[i], nb_clip_dim[i], nb_terminated[i], nb_trials_remain[i],
+        nb_active[i], nb_object_[i], nb_object_sel[i], nb_object_dim[i], nb_object_pos[i],
+        nb_background[i], nb_rotation_parity[i], reward[i]) = (state['grid'], state['grid_dim'], 
+        state['selected'], state['clip'], state['clip_dim'], state['terminated'], state['trials_remain'], 
+        state['object_states']['active'], state['object_states']['object'], state['object_states']['object_sel'],
+        state['object_states']['object_dim'], state['object_states']['object_pos'], state['object_states']['background'], state['object_states']['rotation_parity'], 
+        rwd)
+
+    return (
+        nb_grid, nb_grid_dim, nb_selected, nb_clip, nb_clip_dim, nb_terminated, nb_trials_remain,
+        nb_active, nb_object_, nb_object_sel, nb_object_dim, nb_object_pos, 
+        nb_background, nb_rotation_parity, reward
+    )
+
+
 
 class Runner:
     GRIDS = [
@@ -102,6 +172,7 @@ class Runner:
 
                 # Take actions in env and look the results
                 # Infos contains a ton of useful informations
+                """
                 (grid, grid_dim, selected, clip, clip_dim, terminated, trials_remain, active,
                  object, object_sel, object_dim, object_pos, background, rotation_parity, env_reward) = batch_act(
                     self.input[-1].astype(np.uint8), self.input_dim[-1], self.answer[-1].astype(np.uint8), self.answer_dim[-1],
@@ -110,7 +181,18 @@ class Runner:
                     self.active[-1], self.object[-1].astype(np.uint8), self.object_sel[-1].astype(np.uint8), self.object_dim[-1], 
                     self.object_pos[-1], self.background[-1].astype(np.uint8), self.rotation_parity[-1], 
                     selection.astype(bool), operation
+                )"""
+
+                (grid, grid_dim, selected, clip, clip_dim, terminated, trials_remain, active,
+                 object, object_sel, object_dim, object_pos, background, rotation_parity, env_reward) = batch_act_env(self.env,
+                    self.input[-1].astype(np.uint8), self.input_dim[-1], self.answer[-1].astype(np.uint8), self.answer_dim[-1],
+                    self.grid[-1].astype(np.uint8), self.grid_dim[-1], self.selected[-1].astype(bool), self.clip[-1].astype(np.uint8), 
+                    self.clip_dim[-1], self.terminated[-1], self.trials_remain[-1], 
+                    self.active[-1], self.object[-1].astype(np.uint8), self.object_sel[-1].astype(np.uint8), self.object_dim[-1], 
+                    self.object_pos[-1], self.background[-1].astype(np.uint8), self.rotation_parity[-1], 
+                    selection.astype(bool), operation
                 )
+
                 # append states
                 self.grid.append(grid); self.grid_dim.append(grid_dim); self.selected.append(selected)
                 self.clip.append(clip); self.clip_dim.append(clip_dim); self.terminated.append(terminated)
