@@ -48,13 +48,15 @@ def main(cfg: DictConfig) -> None:
     if cfg.env.use_arc:
         env = gym.make(
             'ARCLE/O2ARCv2Env-v0', 
-            data_loader = SizeConstrainedLoader(cfg.env.grid_x), 
+            data_loader = SizeConstrainedLoader(cfg.env.grid_x),
+            max_trial = 3,
             max_grid_size=(cfg.env.grid_x, cfg.env.grid_y), 
             colors=cfg.env.num_colors)
     else:
         env = gym.make(
             'ARCLE/O2ARCv2Env-v0', 
             data_loader = TestLoader(cfg.env.grid_x, cfg.env.grid_y), 
+            max_trial = 3,
             max_grid_size=(cfg.env.grid_x, cfg.env.grid_y), 
             colors=cfg.env.num_colors)
 
