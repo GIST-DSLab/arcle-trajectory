@@ -39,7 +39,7 @@ class TestLoader(Loader):
         return [([ti],[to],[ei],[eo], {'desc': "just for test"})]
 
 
-@hydra.main(config_path="ppo", config_name="ppo_config_random")
+@hydra.main(config_path="ppo", config_name="ppo_config")
 def main(cfg: DictConfig) -> None:
     wandb.init(
         project="arc_traj_gen",

@@ -1,7 +1,7 @@
 
 env:
-  grid_x: 10
-  grid_y: 10
+  grid_x: 5
+  grid_y: 5
   num_colors: 10
   num_actions: 10
   use_arc: True
@@ -21,14 +21,14 @@ train:
   noptepochs: 4
   cliprange: 0.1
   save_interval: 0
-  total_timesteps: 20000000
+  total_timesteps: 14400000
   gpu_num: 1
   weight_decay: 0.1
   beta1: 0.9
   beta2: 0.95
   cliprew: 10
   update_actor_after: 50
-  
+
 model:
   n_layer: 6
   n_head: 8

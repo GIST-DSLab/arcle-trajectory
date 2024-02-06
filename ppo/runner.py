@@ -56,8 +56,10 @@ def batch_act_env(env, b_inp, b_inp_dim, b_answer, b_answer_dim,
             "selection" : selection,
             "operation" : operation,
         }
+        # render_ansi(env, state)
         env.unwrapped.transition(state, action)
         rwd = env.unwrapped.reward(state)
+        # render_ansi(env, state)
 
         (nb_grid[i], nb_grid_dim[i], nb_selected[i], nb_clip[i], nb_clip_dim[i], nb_terminated[i], nb_trials_remain[i],
         nb_active[i], nb_object_[i], nb_object_sel[i], nb_object_dim[i], nb_object_pos[i],
@@ -73,7 +75,66 @@ def batch_act_env(env, b_inp, b_inp_dim, b_answer, b_answer_dim,
         nb_background, nb_rotation_parity, reward
     )
 
+def render_ansi_with_grids(env, grids, clips):
+        if env.rendering is None:
+            env.rendering = True
+            print('\033[2J',end='')
+        
+        print(f'\033[{env.H+3}A\033[K', end='')
+        print('Problem Description:')
+        print(env.description, '\033[K')
 
+        for grid, clip in zip(grids, clips):
+            grid = grid.squeeze()
+            clip = clip.squeeze()
+
+            grid_dim = env.current_state['grid_dim']
+            sel = env.current_state['selected']
+            clip_dim = env.current_state['clip_dim']
+
+            for i in range(env.H):
+                for j in range(env.W):
+                    d = grid[i,j]
+                    st = "[]" if sel[i,j] else "  " 
+                    if i >= grid_dim[0] or j>= grid_dim[1]:
+                        print(f'\033[47m{st}', end='')
+                    else:
+                        print("\033[48;5;"+str(env.ansi256arc[d])+f"m{st}", end='')
+
+                print("\033[0m  ",end='')
+                for j in range(env.W):
+                    d = clip[i,j]
+                    
+                    if i >= clip_dim[0] or j>= clip_dim[1]:
+                        print('\033[47m  ', end='')
+                    else:
+                        print("\033[48;5;"+str(env.ansi256arc[d])+"m  ", end='')               
+        
+                print('\033[0m')
+
+def render_ansi(env, grid):
+        if env.rendering is None:
+            env.rendering = True
+            print('\033[2J',end='')
+
+        print(f'\033[{env.H+3}A\033[K', end='')
+        print('Problem Description:')
+        print(env.description, '\033[K')
+
+        grid = grid.squeeze()
+
+        state = env.current_state
+        grid_dim = state['grid_dim']
+
+        for i,dd in enumerate(grid):
+            for j,d in enumerate(dd):
+                
+                if i >= grid_dim[0] or j>= grid_dim[1]:
+                    print('\033[47m  ', end='')
+                else:
+                    print("\033[48;5;"+str(env.ansi256arc[d])+"m  ", end='')
+
+            print('\033[0m')
 
 class Runner:
     GRIDS = [
@@ -129,12 +190,17 @@ class Runner:
 
     def _get_selection_from_bbox(self, bboxes):
         selection = np.zeros((len(bboxes), self.cfg.env.grid_x, self.cfg.env.grid_y)).astype(np.uint8)
-        mult = np.array([self.cfg.env.grid_x, self.cfg.env.grid_y, self.cfg.env.grid_x, self.cfg.env.grid_y])
-        bias = np.array([0, 0, - self.cfg.env.grid_x // 2, - self.cfg.env.grid_y // 2])
+        # mult = np.array([self.cfg.env.grid_x, self.cfg.env.grid_y, self.cfg.env.grid_x, self.cfg.env.grid_y])
+        # bias = np.array([0, 0, - self.cfg.env.grid_x // 2, - self.cfg.env.grid_y // 2])
+
+        mult = np.concatenate((self.answer_dim[-1], self.answer_dim[-1]), axis=1)
+        zero_array = np.zeros(self.answer_dim[-1].shape, dtype=int)
+        bias = np.concatenate ((zero_array, - self.answer_dim[-1] // 2), axis=1)
+        
         bboxes = bboxes * mult + bias
         bboxes[:, (2, 3)] = bboxes[:, (2, 3)] + bboxes[:, (0, 1)]
-        bboxes[:, (0, 2)] = np.clip(bboxes[:, (0, 2)], 0, self.cfg.env.grid_x - 1e-3)
-        bboxes[:, (1, 3)] = np.clip(bboxes[:, (1, 3)], 0, self.cfg.env.grid_y - 1e-3)
+        bboxes[:, (0, 2)] = np.clip(bboxes[:, (0, 2)], 0, self.answer_dim[-1][:, (0,0)] - 1e-3)
+        bboxes[:, (1, 3)] = np.clip(bboxes[:, (1, 3)], 0, self.answer_dim[-1][:, (1,1)] - 1e-3)
         bboxes = np.floor(bboxes).astype(int)
         for i, bbox in enumerate(bboxes):
             min_x, min_y = min(bbox[0], bbox[2]), min(bbox[1], bbox[3])
@@ -154,6 +220,7 @@ class Runner:
     def run(self):
         lten = lambda x: torch.tensor(x, dtype=torch.long, device=self.device)
         ften = lambda x: torch.tensor(x, dtype=torch.float, device=self.device)
+        
         with torch.no_grad():
             for step in trange(self.cfg.train.nsteps):
                 # Given observations, get action value and neglopacs
@@ -220,13 +287,15 @@ class Runner:
         nextvalues = fnpy(nextvalues)
 
         gtp1 = np.stack(self.grid[1:])
+        clip = np.stack(self.grid[1:])
+        # render_ansi_with_grids(self.env, gtp1, clip)
         for att in self.STATE_KEYS + self.INFO_KEYS + self.ACTION_KEYS + [
             "vpred", "neglogpac", "reward", "rpred", "rtm1", "rtm1_pred", "ebbox", "gpred"]:
             if att in self.STATE_KEYS + self.INFO_KEYS + ["rtm1"]:
                 setattr(self, att, np.stack(getattr(self, att)[:-1]))
             else:
                 setattr(self, att, np.stack(getattr(self, att)))
-        
+
         # normalize reward
         self.rew_rms.update(self.rtm1.reshape(-1))
         self.rtm1 = self.rew_rms.normalize(self.rtm1, use_mean=True)
@@ -260,7 +329,11 @@ class Runner:
             lten(sf01(gtp1)),
             list(self.sum_rewards),
             list(self.success),
-            self.ebbox)
+            self.ebbox,
+            gtp1,
+            clip,
+            self.input[-1],
+            self.answer[-1])
         self.reset()
 
         return ret

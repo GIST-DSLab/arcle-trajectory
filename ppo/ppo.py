@@ -10,11 +10,16 @@ from tqdm import trange
 import wandb
 from cosine_annealing_warmup import CosineAnnealingWarmupRestarts
 
+from collections import OrderedDict
+
 def learn(cfg, env):
 
     tcfg = cfg.train
     device = get_device(tcfg.gpu_num)
     policy = GPTPolicy(cfg, device).to(device)
+    model_state = torch.load("/data/arcle-trajectory/withbbox/saved_parameter_1400.pth")
+    new_model_state = OrderedDict([(key.replace('_orig_mod.', ''), value) for key, value in model_state.items()])
+    policy.load_state_dict(new_model_state)
     policy = torch.compile(policy)
 
     nenvs = tcfg.nenvs
@@ -44,7 +49,7 @@ def learn(cfg, env):
         # Get minibatch
         print("Rollout:")
         (ob_acs, returns, values, neglogpacs, rtm1, rtm1_pred, norm_rew, rpred, gpred, gtp1,
-         ep_rets, success_ts, ebbox) = runner.run()
+         ep_rets, success_ts, ebbox, unwrapped, clip, input, answer) = runner.run()
         advs = returns - values
         advs = (advs - advs.mean()) / (advs.std() + 1e-8)
 
@@ -130,6 +135,8 @@ def learn(cfg, env):
                 } | logged
             )
             all_ep_rets = []
+            torch.save(policy.state_dict(), "/data/arcle-trajectory/withbbox/saved_parameter_{}.pth".format(update+1400))
+
 
 # Avoid division error when calculate the mean (in our case if epinfo is empty returns np.nan, not return an error)
 def safemean(xs):
